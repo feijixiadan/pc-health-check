@@ -1,0 +1,29 @@
+PC Health Check Report
+Generated at: 2026-06-17 10:30:00
+Mode: Read-only diagnostic. No files or settings were changed.
+Administrator: False
+
+==== Quick Findings ====
+- Memory usage is high: 88.4%. Consider closing background apps or adding RAM.
+- C drive free space is low: 9.8%. Freeing space may noticeably improve performance.
+
+==== System ====
+Computer: [redacted]
+User: [redacted]
+Model: Example Vendor Example Laptop
+OS: Microsoft Windows 11 Pro (10.0.26100)
+Last boot: 2026-06-15 09:20:00
+Uptime: 2 days 1 hours 10 minutes
+
+==== Performance ====
+CPU: Example CPU
+CPU load: 24%
+Memory: total 8.00 GB, free 950.00 MB, used 88.4%
+Disk busy: 12%
+
+==== Drives ====
+C: Windows | size 237.00 GB | free 23.20 GB (9.8%)
+
+==== Next Step Suggestion ====
+Use this report to decide what should be checked next.
+Do not delete files, disable startup items, uninstall apps, reset browsers, or change security settings until the device owner confirms.
