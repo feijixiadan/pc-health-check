@@ -1,0 +1,70 @@
+name: Windows smoke test
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Check PowerShell syntax
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path ".\scripts\pc-health-check.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+          }
+
+      - name: Run read-only diagnostic script
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity
+
+          $desktop = [Environment]::GetFolderPath("Desktop")
+          $txt = Get-ChildItem -Path $desktop -Filter "PC-Health-Report-*.txt" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+          $json = Get-ChildItem -Path $desktop -Filter "PC-Health-Report-*.json" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
+
+          if (-not $txt) {
+            throw "TXT report was not generated."
+          }
+          if (-not $json) {
+            throw "JSON report was not generated."
+          }
+
+          New-Item -ItemType Directory -Force -Path artifacts | Out-Null
+          Copy-Item $txt.FullName artifacts/
+          Copy-Item $json.FullName artifacts/
+
+          Get-Content $txt.FullName -TotalCount 30
+
+      - name: Upload generated reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-health-report
+          path: artifacts/*
