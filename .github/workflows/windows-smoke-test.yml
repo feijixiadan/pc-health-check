@@ -57,6 +57,55 @@ jobs:
             throw "JSON report was not generated."
           }
 
+          $txtContent = Get-Content $txt.FullName -Raw
+          $requiredSections = @(
+            "PC Health Check Report",
+            "==== Quick Findings ====",
+            "==== System ====",
+            "==== Performance ====",
+            "==== Drives ====",
+            "==== Startup Items ====",
+            "==== Antivirus ====",
+            "==== Windows Update ====",
+            "==== Browser Check ====",
+            "==== Temporary Folders ====",
+            "==== Next Step Suggestion ===="
+          )
+
+          foreach ($section in $requiredSections) {
+            if (-not $txtContent.Contains($section)) {
+              throw "TXT report is missing required section: $section"
+            }
+          }
+
+          $report = Get-Content $json.FullName -Raw | ConvertFrom-Json
+          $requiredJsonKeys = @(
+            "GeneratedAt",
+            "Tool",
+            "Mode",
+            "System",
+            "Performance",
+            "Drives",
+            "StartupCommands",
+            "WindowsUpdateServices",
+            "BrowserExtensions",
+            "TempFolders",
+            "Findings"
+          )
+
+          foreach ($key in $requiredJsonKeys) {
+            if (-not $report.PSObject.Properties.Name.Contains($key)) {
+              throw "JSON report is missing required key: $key"
+            }
+          }
+
+          if ($report.System.ComputerName -ne "[redacted]") {
+            throw "Expected redacted computer name in JSON report."
+          }
+          if ($report.System.UserName -ne "[redacted]") {
+            throw "Expected redacted user name in JSON report."
+          }
+
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           Copy-Item $txt.FullName artifacts/
           Copy-Item $json.FullName artifacts/
