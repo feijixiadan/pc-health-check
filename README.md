@@ -30,6 +30,13 @@ PowerShell alternative:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -OpenReport
 ```
 
+For reports that may be shared outside the device owner's private support
+conversation, run with identity redaction:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -OpenReport
+```
+
 ## What It Collects
 
 - Windows version, uptime, device model, and admin status.
@@ -46,6 +53,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps
 ## Privacy Notes
 
 Reports may contain local device information such as computer name, Windows username, startup command paths, process names, device model, and browser extension IDs. Review a report before sharing it publicly.
+
+Use `-RedactIdentity` when a report may be shared in an issue, chat, email, or
+other place outside the device owner's private support conversation. In this
+mode the script redacts the computer name, Windows username, known user profile
+paths, temporary folder paths, startup command user, browser extension IDs,
+local identity paths found inside registry policy values, and console output
+paths. It keeps counts and diagnostic signals where possible.
 
 The script intentionally avoids collecting:
 
