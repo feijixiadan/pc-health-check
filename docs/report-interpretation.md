@@ -14,6 +14,28 @@ Read these sections first:
 6. `Windows Update`
 7. `Browser Check`
 
+## Sharing And Redaction Checklist
+
+Before sharing a report outside the device owner's private support conversation,
+prefer generating it with:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity
+```
+
+Then quickly check that the report does not expose:
+
+- computer name;
+- Windows username;
+- user profile paths such as `C:\Users\...`;
+- temporary folder paths;
+- browser extension IDs;
+- local identity paths inside registry policy values.
+
+The redacted report should still keep useful diagnostic signals such as counts,
+memory pressure, disk free space, pending reboot status, and browser extension
+counts.
+
 ## Common Findings
 
 ### High CPU
