@@ -36,6 +36,46 @@ function Format-DateValue {
     }
 }
 
+function Redact-Text {
+    param($Value)
+
+    if ($null -eq $Value) { return $null }
+    $text = [string]$Value
+    if (-not $RedactIdentity) { return $text }
+
+    $replacements = @(
+        @{ Value = $env:USERPROFILE; Replacement = "[redacted-user-profile]" },
+        @{ Value = $env:LOCALAPPDATA; Replacement = "[redacted-localappdata]" },
+        @{ Value = $env:APPDATA; Replacement = "[redacted-appdata]" },
+        @{ Value = $env:TEMP; Replacement = "[redacted-temp]" },
+        @{ Value = $env:TMP; Replacement = "[redacted-temp]" },
+        @{ Value = $env:COMPUTERNAME; Replacement = "[redacted-computer]" },
+        @{ Value = $env:USERNAME; Replacement = "[redacted-user]" }
+    )
+
+    foreach ($item in $replacements) {
+        if (-not [string]::IsNullOrWhiteSpace($item.Value)) {
+            $escaped = [regex]::Escape([string]$item.Value)
+            $text = [regex]::Replace($text, $escaped, $item.Replacement, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        }
+    }
+
+    $text = [regex]::Replace($text, '(?i)\b[A-Z]:[\\/]+Users[\\/]+[^\\/\s|]+', '[redacted-user-profile]')
+    return $text
+}
+
+function Redact-ExtensionIds {
+    param([string[]]$Ids)
+
+    if (-not $RedactIdentity) { return @($Ids) }
+
+    $index = 0
+    return @($Ids | ForEach-Object {
+        $index += 1
+        "[redacted-extension-id-$index]"
+    })
+}
+
 function Get-RegistryValuesSafe {
     param([string]$Path)
     if (-not (Test-Path $Path)) { return $null }
@@ -44,7 +84,7 @@ function Get-RegistryValuesSafe {
     $result = [ordered]@{}
     foreach ($prop in $item.PSObject.Properties) {
         if ($prop.Name -notmatch '^PS') {
-            $result[$prop.Name] = [string]$prop.Value
+            $result[$prop.Name] = Redact-Text $prop.Value
         }
     }
     return $result
@@ -62,7 +102,7 @@ function Get-FolderSizeQuick {
 
     if ([string]::IsNullOrWhiteSpace($Path) -or -not (Test-Path $Path)) {
         return [ordered]@{
-            Path = $Path
+            Path = Redact-Text $Path
             Exists = $false
             FileCount = 0
             SizeBytes = 0
@@ -85,7 +125,7 @@ function Get-FolderSizeQuick {
     }
 
     return [ordered]@{
-        Path = $Path
+        Path = Redact-Text $Path
         Exists = $true
         FileCount = $count
         SizeBytes = $bytes
@@ -116,6 +156,19 @@ $txtPath = Join-Path $desktop ("PC-Health-Report-{0}.txt" -f $stamp)
 $jsonPath = Join-Path $desktop ("PC-Health-Report-{0}.json" -f $stamp)
 $script:Lines = New-Object System.Collections.Generic.List[string]
 $findings = New-Object System.Collections.Generic.List[string]
+$redactedFields = @()
+if ($RedactIdentity) {
+    $redactedFields = @(
+        "computer name",
+        "Windows username",
+        "known user profile paths",
+        "temporary folder paths",
+        "startup command user",
+        "browser extension IDs",
+        "registry policy values that contain local identity paths",
+        "console report paths"
+    )
+}
 
 $isAdmin = $false
 try {
@@ -171,7 +224,7 @@ $topMemoryProcesses = @(Get-Process | Sort-Object WorkingSet64 -Descending | Sel
 $startupCommands = @(Get-CimInstance Win32_StartupCommand | Sort-Object Location, Name | ForEach-Object {
     [ordered]@{
         Name = $_.Name
-        Location = $_.Location
+        Location = Redact-Text $_.Location
         User = Maybe-Redact $_.User
     }
 })
@@ -250,7 +303,7 @@ foreach ($path in $policyPaths) {
     $values = Get-RegistryValuesSafe $path
     if ($values) {
         $browserPolicies += [ordered]@{
-            Path = $path
+            Path = Redact-Text $path
             Values = $values
         }
     }
@@ -259,8 +312,8 @@ foreach ($path in $policyPaths) {
 $chromeExtensions = @()
 $edgeExtensions = @()
 if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-    $chromeExtensions = Get-BrowserExtensionIds (Join-Path $env:LOCALAPPDATA "Google\Chrome\User Data\Default\Extensions")
-    $edgeExtensions = Get-BrowserExtensionIds (Join-Path $env:LOCALAPPDATA "Microsoft\Edge\User Data\Default\Extensions")
+    $chromeExtensions = Redact-ExtensionIds (Get-BrowserExtensionIds (Join-Path $env:LOCALAPPDATA "Google\Chrome\User Data\Default\Extensions"))
+    $edgeExtensions = Redact-ExtensionIds (Get-BrowserExtensionIds (Join-Path $env:LOCALAPPDATA "Microsoft\Edge\User Data\Default\Extensions"))
 }
 if (($chromeExtensions.Count + $edgeExtensions.Count) -ge 30) { [void]$findings.Add("Many browser extensions detected. Disable suspicious or unused extensions if browser is slow or homepage is hijacked.") }
 
@@ -276,6 +329,10 @@ $report = [ordered]@{
     GeneratedAt = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
     Tool = "PC Health Check"
     Mode = "Read-only diagnostic. No files or settings were changed."
+    Privacy = [ordered]@{
+        RedactIdentity = [bool]$RedactIdentity
+        RedactedFields = @($redactedFields)
+    }
     IsAdministrator = $isAdmin
     System = [ordered]@{
         ComputerName = Maybe-Redact $env:COMPUTERNAME
@@ -319,6 +376,7 @@ $report = [ordered]@{
 Add-Line "PC Health Check Report"
 Add-Line ("Generated at: {0}" -f $report.GeneratedAt)
 Add-Line "Mode: Read-only diagnostic. No files or settings were changed."
+Add-Line ("Identity redaction: {0}" -f $report.Privacy.RedactIdentity)
 Add-Line ("Administrator: {0}" -f $isAdmin)
 
 Add-Section "Quick Findings"
@@ -406,8 +464,8 @@ $report | ConvertTo-Json -Depth 8 | Set-Content -Path $jsonPath -Encoding UTF8
 
 Write-Host ""
 Write-Host "PC Health Check completed."
-Write-Host ("TXT report:  {0}" -f $txtPath)
-Write-Host ("JSON report: {0}" -f $jsonPath)
+Write-Host ("TXT report:  {0}" -f (Redact-Text $txtPath))
+Write-Host ("JSON report: {0}" -f (Redact-Text $jsonPath))
 Write-Host ""
 
 if ($OpenReport -and (Test-Path $txtPath)) {
