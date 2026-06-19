@@ -78,11 +78,13 @@ jobs:
             }
           }
 
-          $report = Get-Content $json.FullName -Raw | ConvertFrom-Json
+          $jsonContent = Get-Content $json.FullName -Raw
+          $report = $jsonContent | ConvertFrom-Json
           $requiredJsonKeys = @(
             "GeneratedAt",
             "Tool",
             "Mode",
+            "Privacy",
             "System",
             "Performance",
             "Drives",
@@ -104,6 +106,29 @@ jobs:
           }
           if ($report.System.UserName -ne "[redacted]") {
             throw "Expected redacted user name in JSON report."
+          }
+          if ($report.Privacy.RedactIdentity -ne $true) {
+            throw "Expected Privacy.RedactIdentity to be true in JSON report."
+          }
+
+          $identityNeedles = @($env:USERNAME, $env:COMPUTERNAME) |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+
+          foreach ($needle in $identityNeedles) {
+            if ($txtContent.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+              throw "TXT report contains unredacted identity value: $needle"
+            }
+            if ($jsonContent.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+              throw "JSON report contains unredacted identity value: $needle"
+            }
+          }
+
+          $chromeIds = @($report.BrowserExtensions.ChromeIds)
+          $edgeIds = @($report.BrowserExtensions.EdgeIds)
+          foreach ($extensionId in @($chromeIds + $edgeIds)) {
+            if ($extensionId -and -not ([string]$extensionId).StartsWith("[redacted-extension-id-")) {
+              throw "Browser extension ID was not redacted: $extensionId"
+            }
           }
 
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
