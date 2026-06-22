@@ -37,6 +37,11 @@ conversation, run with identity redaction:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -OpenReport
 ```
 
+Chinese helper docs:
+
+- [中文快速开始](docs/zh-CN/quick-start.md)
+- [报告分享与隐私检查](docs/zh-CN/report-sharing.md)
+
 ## What It Collects
 
 - Windows version, uptime, device model, and admin status.
