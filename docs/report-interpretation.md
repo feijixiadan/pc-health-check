@@ -1,6 +1,8 @@
 # Report Interpretation Guide
 
 This guide helps maintainers and helpers read `PC-Health-Report-*.txt`.
+When `-HtmlReport` is used, the same first-pass signals are also available in a
+self-contained `PC-Health-Report-*.html` file for easier reading.
 
 ## Start Here
 
@@ -21,6 +23,12 @@ prefer generating it with:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity
+```
+
+If a non-technical helper needs an easier report view, add `-HtmlReport`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -HtmlReport
 ```
 
 Then quickly check that the report does not expose:
