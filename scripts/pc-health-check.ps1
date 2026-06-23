@@ -1,6 +1,7 @@
 param(
     [switch]$OpenReport,
-    [switch]$RedactIdentity
+    [switch]$RedactIdentity,
+    [switch]$HtmlReport
 )
 
 $ErrorActionPreference = "SilentlyContinue"
@@ -34,6 +35,12 @@ function Format-DateValue {
     } catch {
         return [string]$Value
     }
+}
+
+function Format-Html {
+    param($Value)
+    if ($null -eq $Value) { return "" }
+    return [System.Net.WebUtility]::HtmlEncode([string]$Value)
 }
 
 function Redact-Text {
@@ -154,6 +161,7 @@ if ([string]::IsNullOrWhiteSpace($desktop)) {
 
 $txtPath = Join-Path $desktop ("PC-Health-Report-{0}.txt" -f $stamp)
 $jsonPath = Join-Path $desktop ("PC-Health-Report-{0}.json" -f $stamp)
+$htmlPath = Join-Path $desktop ("PC-Health-Report-{0}.html" -f $stamp)
 $script:Lines = New-Object System.Collections.Generic.List[string]
 $findings = New-Object System.Collections.Generic.List[string]
 $redactedFields = @()
@@ -462,12 +470,126 @@ Add-Line "Do not delete files, disable startup items, uninstall apps, reset brow
 $Lines | Set-Content -Path $txtPath -Encoding UTF8
 $report | ConvertTo-Json -Depth 8 | Set-Content -Path $jsonPath -Encoding UTF8
 
+if ($HtmlReport) {
+    $htmlLines = New-Object System.Collections.Generic.List[string]
+    [void]$htmlLines.Add("<!doctype html>")
+    [void]$htmlLines.Add("<html lang=""en"">")
+    [void]$htmlLines.Add("<head>")
+    [void]$htmlLines.Add("<meta charset=""utf-8"">")
+    [void]$htmlLines.Add("<meta name=""viewport"" content=""width=device-width, initial-scale=1"">")
+    [void]$htmlLines.Add("<title>PC Health Check Report</title>")
+    [void]$htmlLines.Add("<style>")
+    [void]$htmlLines.Add("body{font-family:Segoe UI,Arial,sans-serif;margin:0;background:#f6f8fa;color:#1f2328;line-height:1.45}")
+    [void]$htmlLines.Add("main{max-width:980px;margin:0 auto;padding:24px}")
+    [void]$htmlLines.Add("header{border-bottom:1px solid #d8dee4;margin-bottom:20px;padding-bottom:12px}")
+    [void]$htmlLines.Add("h1{font-size:28px;margin:0 0 8px}h2{font-size:20px;margin:0 0 12px}")
+    [void]$htmlLines.Add(".meta{color:#57606a}.card{background:#fff;border:1px solid #d8dee4;border-radius:6px;margin:16px 0;padding:16px}")
+    [void]$htmlLines.Add(".grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}")
+    [void]$htmlLines.Add(".kv{border:1px solid #d8dee4;border-radius:6px;padding:10px}.label{color:#57606a;font-size:12px;text-transform:uppercase}.value{font-weight:600;margin-top:4px}")
+    [void]$htmlLines.Add("table{border-collapse:collapse;width:100%;font-size:14px}th,td{border-bottom:1px solid #d8dee4;padding:8px;text-align:left;vertical-align:top}th{background:#f6f8fa}")
+    [void]$htmlLines.Add(".finding{background:#fff8c5;border:1px solid #eac54f;border-radius:6px;margin:8px 0;padding:10px}.ok{background:#dafbe1;border-color:#4ac26b}")
+    [void]$htmlLines.Add(".privacy{background:#ddf4ff;border-color:#54aeff}.small{font-size:13px;color:#57606a}")
+    [void]$htmlLines.Add("</style>")
+    [void]$htmlLines.Add("</head>")
+    [void]$htmlLines.Add("<body><main>")
+    [void]$htmlLines.Add("<header><h1>PC Health Check Report</h1><div class=""meta"">Generated at: $(Format-Html $report.GeneratedAt)</div><div class=""meta"">Mode: $(Format-Html $report.Mode)</div></header>")
+
+    [void]$htmlLines.Add("<section class=""card privacy""><h2>Privacy</h2><div class=""grid"">")
+    [void]$htmlLines.Add("<div class=""kv""><div class=""label"">Identity redaction</div><div class=""value"">$(Format-Html $report.Privacy.RedactIdentity)</div></div>")
+    [void]$htmlLines.Add("<div class=""kv""><div class=""label"">Administrator</div><div class=""value"">$(Format-Html $report.IsAdministrator)</div></div>")
+    [void]$htmlLines.Add("</div>")
+    if ($report.Privacy.RedactedFields.Count -gt 0) {
+        [void]$htmlLines.Add("<p class=""small"">Redacted fields: $(Format-Html (($report.Privacy.RedactedFields) -join ', '))</p>")
+    }
+    [void]$htmlLines.Add("</section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Quick Findings</h2>")
+    if ($findings.Count -eq 0) {
+        [void]$htmlLines.Add("<div class=""finding ok"">No obvious high-risk performance issue was detected by the quick check.</div>")
+    } else {
+        foreach ($finding in $findings) {
+            [void]$htmlLines.Add("<div class=""finding"">$(Format-Html $finding)</div>")
+        }
+    }
+    [void]$htmlLines.Add("</section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>System</h2><div class=""grid"">")
+    foreach ($item in @(
+        @("Computer", $report.System.ComputerName),
+        @("User", $report.System.UserName),
+        @("Model", ("{0} {1}" -f $report.System.Manufacturer, $report.System.Model)),
+        @("OS", ("{0} ({1})" -f $report.System.OS, $report.System.OSVersion)),
+        @("Last boot", $report.System.LastBootUpTime),
+        @("Uptime", $report.System.Uptime)
+    )) {
+        [void]$htmlLines.Add("<div class=""kv""><div class=""label"">$(Format-Html $item[0])</div><div class=""value"">$(Format-Html $item[1])</div></div>")
+    }
+    [void]$htmlLines.Add("</div></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Performance</h2><div class=""grid"">")
+    foreach ($item in @(
+        @("CPU", $report.Performance.CPUName),
+        @("CPU load", ("{0}%" -f $report.Performance.CPULoadPercent)),
+        @("Memory", ("total {0}, free {1}, used {2}%" -f $report.Performance.TotalMemory, $report.Performance.FreeMemory, $report.Performance.UsedMemoryPercent)),
+        @("Disk busy", ("{0}%" -f $report.Performance.DiskBusyPercent))
+    )) {
+        [void]$htmlLines.Add("<div class=""kv""><div class=""label"">$(Format-Html $item[0])</div><div class=""value"">$(Format-Html $item[1])</div></div>")
+    }
+    [void]$htmlLines.Add("</div></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Drives</h2><table><thead><tr><th>Drive</th><th>Volume</th><th>Size</th><th>Free</th><th>Free %</th></tr></thead><tbody>")
+    foreach ($drive in $drives) {
+        [void]$htmlLines.Add("<tr><td>$(Format-Html $drive.Drive)</td><td>$(Format-Html $drive.VolumeName)</td><td>$(Format-Html $drive.Size)</td><td>$(Format-Html $drive.Free)</td><td>$(Format-Html $drive.FreePercent)</td></tr>")
+    }
+    [void]$htmlLines.Add("</tbody></table></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Startup Items</h2><p>Count: $(Format-Html $startupCommands.Count)</p><table><thead><tr><th>Name</th><th>Location</th><th>User</th></tr></thead><tbody>")
+    foreach ($item in $startupCommands) {
+        [void]$htmlLines.Add("<tr><td>$(Format-Html $item.Name)</td><td>$(Format-Html $item.Location)</td><td>$(Format-Html $item.User)</td></tr>")
+    }
+    [void]$htmlLines.Add("</tbody></table></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Antivirus</h2><table><thead><tr><th>Name</th><th>State</th></tr></thead><tbody>")
+    foreach ($av in $antivirus) {
+        [void]$htmlLines.Add("<tr><td>$(Format-Html $av.DisplayName)</td><td>$(Format-Html $av.ProductState)</td></tr>")
+    }
+    [void]$htmlLines.Add("</tbody></table></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Windows Update</h2><p>Pending reboot: $(Format-Html $pendingReboot)</p><table><thead><tr><th>Service</th><th>Status</th><th>Start type</th></tr></thead><tbody>")
+    foreach ($svc in $wuServices) {
+        [void]$htmlLines.Add("<tr><td>$(Format-Html $svc.Name)</td><td>$(Format-Html $svc.Status)</td><td>$(Format-Html $svc.StartType)</td></tr>")
+    }
+    [void]$htmlLines.Add("</tbody></table></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Browser Check</h2><div class=""grid"">")
+    [void]$htmlLines.Add("<div class=""kv""><div class=""label"">Chrome extensions</div><div class=""value"">$(Format-Html $chromeExtensions.Count)</div></div>")
+    [void]$htmlLines.Add("<div class=""kv""><div class=""label"">Edge extensions</div><div class=""value"">$(Format-Html $edgeExtensions.Count)</div></div>")
+    [void]$htmlLines.Add("</div></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Temporary Folders</h2><table><thead><tr><th>Path</th><th>Exists</th><th>Files scanned</th><th>Size</th><th>Limited</th></tr></thead><tbody>")
+    foreach ($temp in $tempFolders) {
+        [void]$htmlLines.Add("<tr><td>$(Format-Html $temp.Path)</td><td>$(Format-Html $temp.Exists)</td><td>$(Format-Html $temp.FileCount)</td><td>$(Format-Html $temp.Size)</td><td>$(Format-Html $temp.Limited)</td></tr>")
+    }
+    [void]$htmlLines.Add("</tbody></table></section>")
+
+    [void]$htmlLines.Add("<section class=""card""><h2>Next Step Suggestion</h2><p>Use this report to decide what should be checked next.</p><p>Do not delete files, disable startup items, uninstall apps, reset browsers, or change security settings until the device owner confirms.</p></section>")
+    [void]$htmlLines.Add("</main></body></html>")
+    $htmlLines | Set-Content -Path $htmlPath -Encoding UTF8
+}
+
 Write-Host ""
 Write-Host "PC Health Check completed."
 Write-Host ("TXT report:  {0}" -f (Redact-Text $txtPath))
 Write-Host ("JSON report: {0}" -f (Redact-Text $jsonPath))
+if ($HtmlReport) {
+    Write-Host ("HTML report: {0}" -f (Redact-Text $htmlPath))
+}
 Write-Host ""
 
 if ($OpenReport -and (Test-Path $txtPath)) {
-    Start-Process -FilePath notepad.exe -ArgumentList ('"{0}"' -f $txtPath)
+    if ($HtmlReport -and (Test-Path $htmlPath)) {
+        Start-Process -FilePath $htmlPath
+    } else {
+        Start-Process -FilePath notepad.exe -ArgumentList ('"{0}"' -f $txtPath)
+    }
 }
