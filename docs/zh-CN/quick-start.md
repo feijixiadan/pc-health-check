@@ -47,6 +47,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -OpenReport
 ```
 
+如果你想给不懂技术的人看一个更清楚的页面，可以加上 HTML 报告：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -HtmlReport -OpenReport
+```
+
+HTML 报告是本地文件，不包含 JavaScript，不加载外部资源，也不会联网。
+
 ## 先看哪些部分
 
 建议按这个顺序看：
