@@ -37,6 +37,12 @@ conversation, run with identity redaction:
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -OpenReport
 ```
 
+Optional HTML report:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -HtmlReport -OpenReport
+```
+
 Chinese helper docs:
 
 - [中文快速开始](docs/zh-CN/quick-start.md)
@@ -54,6 +60,13 @@ Chinese helper docs:
 - Pending reboot signals.
 - Chrome and Edge extension counts and extension IDs.
 - Approximate temporary folder size with a file scan limit.
+
+## Report Formats
+
+The script always writes a plain text report and a JSON report. Use
+`-HtmlReport` to also write a local HTML report for easier reading by
+non-technical helpers. The HTML report is self-contained: it uses inline styles,
+no JavaScript, no external assets, and no network calls.
 
 ## Privacy Notes
 
