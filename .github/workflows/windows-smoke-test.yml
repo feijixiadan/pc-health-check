@@ -40,7 +40,7 @@ jobs:
         run: |
           $ErrorActionPreference = "Stop"
 
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -HtmlReport
 
           $desktop = [Environment]::GetFolderPath("Desktop")
           $txt = Get-ChildItem -Path $desktop -Filter "PC-Health-Report-*.txt" |
@@ -49,12 +49,18 @@ jobs:
           $json = Get-ChildItem -Path $desktop -Filter "PC-Health-Report-*.json" |
             Sort-Object LastWriteTime -Descending |
             Select-Object -First 1
+          $html = Get-ChildItem -Path $desktop -Filter "PC-Health-Report-*.html" |
+            Sort-Object LastWriteTime -Descending |
+            Select-Object -First 1
 
           if (-not $txt) {
             throw "TXT report was not generated."
           }
           if (-not $json) {
             throw "JSON report was not generated."
+          }
+          if (-not $html) {
+            throw "HTML report was not generated."
           }
 
           $txtContent = Get-Content $txt.FullName -Raw
@@ -80,6 +86,7 @@ jobs:
 
           $jsonContent = Get-Content $json.FullName -Raw
           $report = $jsonContent | ConvertFrom-Json
+          $htmlContent = Get-Content $html.FullName -Raw
           $requiredJsonKeys = @(
             "GeneratedAt",
             "Tool",
@@ -110,6 +117,15 @@ jobs:
           if ($report.Privacy.RedactIdentity -ne $true) {
             throw "Expected Privacy.RedactIdentity to be true in JSON report."
           }
+          if (-not $htmlContent.Contains("<title>PC Health Check Report</title>")) {
+            throw "HTML report is missing the expected title."
+          }
+          if (-not $htmlContent.Contains("Identity redaction")) {
+            throw "HTML report is missing privacy metadata."
+          }
+          if (-not $htmlContent.Contains("Quick Findings")) {
+            throw "HTML report is missing quick findings."
+          }
 
           $identityNeedles = @($env:USERNAME, $env:COMPUTERNAME) |
             Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
@@ -120,6 +136,9 @@ jobs:
             }
             if ($jsonContent.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
               throw "JSON report contains unredacted identity value: $needle"
+            }
+            if ($htmlContent.IndexOf($needle, [System.StringComparison]::OrdinalIgnoreCase) -ge 0) {
+              throw "HTML report contains unredacted identity value: $needle"
             }
           }
 
@@ -134,6 +153,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path artifacts | Out-Null
           Copy-Item $txt.FullName artifacts/
           Copy-Item $json.FullName artifacts/
+          Copy-Item $html.FullName artifacts/
 
           Get-Content $txt.FullName -TotalCount 30
 
