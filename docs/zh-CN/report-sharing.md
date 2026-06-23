@@ -12,6 +12,14 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps
 
 这个模式会尽量隐藏本地身份信息，同时保留诊断所需的数量、状态和健康信号。
 
+如果要生成更容易阅读的 HTML 报告，可以使用：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\pc-health-check.ps1 -RedactIdentity -HtmlReport -OpenReport
+```
+
+HTML 报告是本地自包含文件，不包含 JavaScript，不加载外部资源，也不会联网。公开分享前仍然需要人工检查。
+
 ## `-RedactIdentity` 会处理什么
 
 当前会处理：
