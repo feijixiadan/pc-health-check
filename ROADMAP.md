@@ -7,6 +7,8 @@ first-pass Windows diagnostic report.
 ## Near Term
 
 - Validate the script on real Windows 10 and Windows 11 machines.
+- Use `docs/windows-validation-checklist.md` to record sanitized real-machine
+  validation evidence.
 - Add sanitized sample reports from real test runs.
 - Improve the JSON report shape so future automation can consume it safely.
 - Document known limitations and false-positive cases.
