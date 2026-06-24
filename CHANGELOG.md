@@ -7,6 +7,7 @@
 - Added CI assertions for report redaction metadata and sensitive identity leaks.
 - Added Chinese helper quick start and report sharing guidance.
 - Added optional `-HtmlReport` output with CI checks.
+- Added a Windows 10/11 validation checklist for real-machine testing.
 
 ## 0.1.0 - 2026-06-17
 
