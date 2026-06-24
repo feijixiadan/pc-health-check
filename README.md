@@ -48,6 +48,10 @@ Chinese helper docs:
 - [中文快速开始](docs/zh-CN/quick-start.md)
 - [报告分享与隐私检查](docs/zh-CN/report-sharing.md)
 
+Validation docs:
+
+- [Windows validation checklist](docs/windows-validation-checklist.md)
+
 ## What It Collects
 
 - Windows version, uptime, device model, and admin status.
@@ -93,9 +97,8 @@ This tool is diagnostic only. After reading the report, a human should decide wh
 
 ## Project Roadmap
 
-- Add report redaction mode.
-- Add localized report templates.
-- Add HTML report output.
+- Validate the script on real Windows 10 and Windows 11 machines.
+- Add sanitized sample reports from real test runs.
 - Add optional signed release artifacts.
 - Add tests for report formatting logic.
 - Add issue templates for false positives and privacy concerns.
